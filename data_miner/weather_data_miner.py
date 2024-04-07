@@ -57,7 +57,7 @@ class WeatherDataMiner:
 
         start_date_str = self.date_tracking.get(location_name, self.oldest_date.strftime('%Y-%m-%d'))
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-        end_date = datetime.utcnow() - timedelta(days=1)
+        end_date = datetime.utcnow()
         all_data = []
             
         while start_date < end_date:
@@ -93,7 +93,7 @@ class WeatherDataMiner:
                 logging.error('All API keys have been rate limited. Stopping application.')
                 raise Exception('All API keys rate limited')  # Or use a more specific exception
             try:
-                url = f'{self.base_url}/history/hourly?lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&key={self.api_key}'
+                url = f'{self.base_url}/history/hourly?tz=local&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&key={self.api_key}'
                 response = requests.get(url)
                 response.raise_for_status()  # This will raise an exception for HTTP errors
                 return response.json()['data']
