@@ -37,7 +37,7 @@ class WeatherDataMiner:
         for location in self.locations:
             try:
                 self.mine_location(location)
-                logging.info('All data collection complete.')
+                logging.info(f'All data collection completed for {location}.')
             except Exception as e:
                 logging.error(f'An error occurred while processing location {location["name"]}: {e}')
                 break
@@ -57,7 +57,7 @@ class WeatherDataMiner:
 
         start_date_str = self.date_tracking.get(location_name, self.oldest_date.strftime('%Y-%m-%d'))
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
-        end_date = datetime.utcnow()
+        end_date = datetime.utcnow() - timedelta(days=1)
         all_data = []
             
         while start_date < end_date:

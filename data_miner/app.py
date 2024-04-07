@@ -1,5 +1,5 @@
 from dotenv import load_dotenv
-from data_miner.weather_data_miner import WeatherDataMiner
+from weather_data_miner import WeatherDataMiner
 
 # Load environment variables from .env file
 load_dotenv()
