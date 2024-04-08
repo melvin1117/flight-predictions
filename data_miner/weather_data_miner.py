@@ -5,10 +5,7 @@ import os
 import json
 import logging
 import time
-
-# Constants
-OUTPUT_DATA_FOLDER = 'data'
-TRACKER_FILE = f'tracker/date_tracking.json'
+from constants.constants import HOURLY, MODES, OUTPUT_DATA_FOLDER
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -22,6 +19,10 @@ class WeatherDataMiner:
         """
         self.base_url = os.getenv('BASE_URL')
         self.api_keys = os.getenv('API_KEYS').split(',')
+        self.mode = os.getenv('MODE', HOURLY)
+        print(MODES[self.mode]['URL'])
+        if self.mode not in MODES.keys():
+            raise Exception(f"Invalid mode selected. Select a valid mode. ({MODES.keys()})")
         self.current_key_index = 0
         self.oldest_date = datetime.strptime(os.getenv('OLDEST_DATE'), '%Y-%m-%d')
         self.days_per_request = int(os.getenv('DAYS_PER_REQUEST', 28))
@@ -53,7 +54,7 @@ class WeatherDataMiner:
         lat = location['lat']
         lon = location['lon']
         location_name = location['name']
-        filename = f'{location_name}_weather_data.csv'
+        filename = f'{location_name}_weather_data_{self.mode}.csv'
 
         start_date_str = self.date_tracking.get(location_name, self.oldest_date.strftime('%Y-%m-%d'))
         start_date = datetime.strptime(start_date_str, '%Y-%m-%d')
@@ -82,8 +83,6 @@ class WeatherDataMiner:
         if len(all_data):
             logging.info(f'Data saved to {filename} from {start_date} to {end_date}')
 
-    # @sleep_and_retry
-    # @limits(calls=REQUESTS_PER_SECOND, period=SECONDS)
     def get_weather_data_with_retry(self, lat, lon, start_date, end_date):
         """Makes an API call to retrieve weather data with rate limiting and retries."""
         attempt = 0
@@ -93,7 +92,7 @@ class WeatherDataMiner:
                 logging.error('All API keys have been rate limited. Stopping application.')
                 raise Exception('All API keys rate limited')  # Or use a more specific exception
             try:
-                url = f'{self.base_url}/history/hourly?tz=local&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&key={self.api_key}'
+                url = f'{self.base_url}{MODES[self.mode]["URL"]}?tz=local&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&key={self.api_key}'
                 response = requests.get(url)
                 response.raise_for_status()  # This will raise an exception for HTTP errors
                 return response.json()['data']
@@ -173,13 +172,13 @@ class WeatherDataMiner:
 
     def load_date_tracking(self):
         """Loads the date tracking from a JSON file."""
-        if os.path.exists(TRACKER_FILE):
-            with open(TRACKER_FILE, 'r') as file:
+        if os.path.exists(MODES[self.mode]['TRACKER']):
+            with open(MODES[self.mode]['TRACKER'], 'r') as file:
                 return json.load(file)
         else:
             return {}
 
     def save_date_tracking(self, date_tracking):
         """Saves the date tracking to a JSON file."""
-        with open(TRACKER_FILE, 'w') as file:
+        with open(MODES[self.mode]['TRACKER'], 'w') as file:
             json.dump(date_tracking, file)
