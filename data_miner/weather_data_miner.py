@@ -5,7 +5,7 @@ import os
 import json
 import logging
 import time
-from constants.constants import HOURLY, MODES, OUTPUT_DATA_FOLDER
+from constants.constants import HOURLY, MODES, OUTPUT_DATA_FOLDER, FORECAST
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -19,8 +19,7 @@ class WeatherDataMiner:
         """
         self.base_url = os.getenv('BASE_URL')
         self.api_keys = os.getenv('API_KEYS').split(',')
-        self.mode = os.getenv('MODE', HOURLY)
-        print(MODES[self.mode]['URL'])
+        self.mode = os.getenv('MODE', HOURLY).lower()
         if self.mode not in MODES.keys():
             raise Exception(f"Invalid mode selected. Select a valid mode. ({MODES.keys()})")
         self.current_key_index = 0
@@ -32,6 +31,7 @@ class WeatherDataMiner:
         self.locations = json.loads(os.getenv('LOCATIONS'))
         self.api_key = self.get_api_key()
         self.date_tracking = self.load_date_tracking()
+        self.forecast_hours = int(os.getenv('FORECAST_HOURS', 240))
 
     def run(self):
         """Runs the data mining process for all configured locations."""
@@ -70,15 +70,17 @@ class WeatherDataMiner:
                     raise
                 logging.warning(f'Failed to fetch data after {self.max_retries} retries. Saving collected data and terminating.')
                 self.save_to_csv(all_data, filename)
-                self.date_tracking[location_name] = start_date.strftime('%Y-%m-%d')
-                self.save_date_tracking(self.date_tracking)
+                if self.mode != FORECAST:
+                    self.date_tracking[location_name] = start_date.strftime('%Y-%m-%d')
+                    self.save_date_tracking(self.date_tracking)
                 break
             all_data.extend(data)
             if (current_end_date - self.oldest_date).days >= self.save_checkpoint_months*30 or current_end_date == end_date:
                 self.save_to_csv(all_data, filename)
                 all_data = []
-                self.date_tracking[location_name] = current_end_date.strftime('%Y-%m-%d')
-                self.save_date_tracking(self.date_tracking)
+                if self.mode != FORECAST:
+                    self.date_tracking[location_name] = current_end_date.strftime('%Y-%m-%d')
+                    self.save_date_tracking(self.date_tracking)
             start_date = current_end_date
         if len(all_data):
             logging.info(f'Data saved to {filename} from {start_date} to {end_date}')
@@ -92,7 +94,10 @@ class WeatherDataMiner:
                 logging.error('All API keys have been rate limited. Stopping application.')
                 raise Exception('All API keys rate limited')  # Or use a more specific exception
             try:
-                url = f'{self.base_url}{MODES[self.mode]["URL"]}?tz=local&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&key={self.api_key}'
+                if self.mode == FORECAST:
+                    url = f'{self.base_url}{MODES[self.mode]["URL"]}?tz=local&lat={lat}&lon={lon}&key={self.api_key}&hours={self.forecast_hours}'
+                else:
+                    url = f'{self.base_url}{MODES[self.mode]["URL"]}?tz=local&lat={lat}&lon={lon}&start_date={start_date}&end_date={end_date}&key={self.api_key}'
                 response = requests.get(url)
                 response.raise_for_status()  # This will raise an exception for HTTP errors
                 return response.json()['data']
